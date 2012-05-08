@@ -27,6 +27,12 @@ Jack-Benny Persson
 <th>By</th>
 </tr>
 <tr>
+<td>Rev. 3</td>
+<td>2012-05-09</td>
+<td>Added flow:established problem</td>
+<td>jackbenny</td>
+</tr>
+<tr>
 <td>Rev. 2</td>
 <td>2012-05-08</td>
 <td>Removed [rm *-e] and replaced it with [sed -i ""]</td>
@@ -39,6 +45,7 @@ Jack-Benny Persson
 <td>jackbenny</td>
 </tr>
 </table>
+<h2>Enable/disable rules bug</h2>
 <p>
 I started using the Snort package for pfSense 2.0.1 (amd64) some days ago but as many others I noticed the problem with the enable/disabled rules resetting after updating the rules.<br />
 So last night I started working on a quick fix for it, and came up with a nice and working solution. My solution involves enabling and disabling specific rules in a oinkmaster.conf file, so it&#039;s not a GUI solution. But at least now it&#039;s possible to have your own set of enabled/disabled rules.<br />
@@ -52,11 +59,11 @@ For pfSense 2.0.1 amd64 use the following command (change URL according your pla
 <br />pkg_add wget-1.12_2.tbz
 </pre>
 <p>
-<br /><br />
+<br />
 
 <b>Next step</b> is to create a /etc/oinkmaster.conf file. Mine looks like this (change the Snort URL to include your oinkcode and change the snapshot version if you&#039;re a basic user or subscriber, look at the list on snort.org, for example use snapshot-2905 if you don&#039;t have a paid subscription).<br />
 Note: Change your enabled/disabled rule at the bottom, this is just my own example, tweak to your needs.
-<br /><br />
+<br />
 </p>
 <pre>
 ############################# 
@@ -99,9 +106,9 @@ disablesid 19110, 19139, 19140, 19138, 19155, 19137, 19157, 19168, 19209, 19826
 </pre>
 <p>
 
+
 <br />
-<br /><br />
-<b>Last step</b> is to create a small shell script which will handle the update and coping of rules etc. Every time the script is being run it will download a new set of rules, enable/disable the rules you&#039;ve chosen in oinkmaster.conf, copy the files to /usr/local/etc/snort/rules and /usr/local/etc/snort/snort_YOURNIC/rules.<br />
+<b>Last step</b> is to create a small shell script (I've named it update_rules.sh) which will handle the update and coping of rules etc. Every time the script is being run it will download a new set of rules, enable/disable the rules you&#039;ve chosen in oinkmaster.conf, copy the files to /usr/local/etc/snort/rules and /usr/local/etc/snort/snort_YOURNIC/rules.<br />
 <b>Note: You need to change the NIC variable!</b><br />
 <br />
 </p>
@@ -109,6 +116,7 @@ disablesid 19110, 19139, 19140, 19138, 19155, 19137, 19157, 19168, 19209, 19826
 <pre>
 #!/bin/sh
 #################################################
+# update_rules.sh                               #
 # Solution to pfSense/Snort rule disable/enable #
 # Written by Jack-Benny                         #
 #################################################
@@ -146,7 +154,7 @@ echo &quot;Your new rules have been downloaded and Snort has been restarted&quot
 
 <p>
 
-<br /><br />If you&#039;d like <b>automatic updates</b>, just put the shell script in your crontab and let it run every 12 hour or so. Here is an example of my crontab.
+<br />If you&#039;d like <b>automatic updates</b>, just put the shell script in your crontab and let it run every 12 hour or so. Here is an example of my crontab.
 <br /><b>Don&#039;t forget to turn of automatic updates in the WebGUI</b>
 <br />
 
@@ -154,7 +162,75 @@ echo &quot;Your new rules have been downloaded and Snort has been restarted&quot
 <pre>0 */12 * * * /root/update_rules.sh &gt; /root/last_rule_update.log 2&gt;&amp;1
 </pre>
 
+<h2>Other problems you might encounter</h2>
+<h3>Rules with flow:established won't work?</h3>
 <p>
+For some reason my Snort wouldn't trigger any alerts on rules that contained the <i>flow:established</i> keyword. I noticed something was wrong when my pfSense/Snort had been live for about week without any alerts at all. So I got suspicous and tested it thoroughly with various simple rules. Still nothing. I couldn't figure out what I was doing wrong. So just out of curiosity I started to modify the rules to see what happend. All of the sudden I've got a rule to trigger alerts! What had I done? I'd removed the <i>flow:established</i> keyword from the rule. I tried it out on some other rules aswell, and got the same effect. So instantly I started googling the problem and found out that many people were seeing this issue aswell (although it didn't seem to be affecting many pfSense users at all, mostly people running Snort on their Linux machines). But nonetheless, other people were seeing this issue aswell, so I was not alone.
+Several people had been asking about it in various forums. Often the reply was that their box must be misconfigured somehow so that the TCP packages isn't properly assembled. I found out that there are several config options one could try to make Snort reassemble the packges. But these were all already activated in my config. So what's left to make it work now? Remove all the <i>flow:established</i> keywords from all the rules. After some reading, I've come to the conclusion that this shouldn't have any big negative side effects.
+</p>
+<p>
+<b>To remove all <i>flow:established</i> keywords from all the rules</b> simply add the following lines to the pfSense/Snort rules bug fix script (above) after the lines <i>"# We must add a whitespace after every "#" to make it work with the GUI"</i>.
+</p>
+<pre>
+# Next remove all of the flow:established keywords, it doesn't work...
+/usr/bin/sed -i "" -f /root/no_established.sed /tmp/snort_rules/snort_*
+</pre>
+<p>
+<b>The script should now look like this:</b>
+</p>
+<pre>
+#!/bin/sh
+#################################################
+# update_rules.sh                               #
+# Solution to pfSense/Snort rule disable/enable #
+# Written by Jack-Benny                         #
+#################################################
+
+# Define your Snort interface
+SNORT_NIC="47399_em0"
+
+# Check if tmp dir exists, and if not, create it
+if [ ! -d "/tmp/snort_rules" ]; then
+/bin/mkdir /tmp/snort_rules
+fi
+
+# Time do download our new snort rules
+/usr/local/bin/oinkmaster.pl -o /tmp/snort_rules
+
+# Lets begin with adding the snort_ prefix to our rules
+cd /tmp/snort_rules
+for f in *
+do /bin/mv "$f" "snort_$f"
+done
+
+# We must add a whitespace after every "#" to make it compatible
+/usr/bin/sed -i "" -e 's/^\#alert/\# alert/g' snort_*
+
+# Next remove all of the flow:established keywords, it doesn't work...
+/usr/bin/sed -i "-e" -f /root/no_established.sed /tmp/snort_rules/snort_*
+
+# Now move them all to the correct locations
+/bin/mv /tmp/snort_rules/snort_* /usr/local/etc/snort/rules/ 
+/bin/cp /usr/local/etc/snort/rules/snort_* \
+/usr/local/etc/snort/snort_${SNORT_NIC}/rules/
+
+# And finally, restart Snort
+/usr/local/etc/rc.d/snort.sh start
+
+echo "Your new rules have been downloaded and Snort has been restarted"
+</pre>
+<p>
+<b>Next step</b> now is to create a new file with the sed replace commands in. As you can see from the script I've placed this file unde /root and named it <i>no_established.sed</i>.
+This is a a sed script file which contains the following lines:
+</p>
+<pre>
+s/\,established\;/\;/g
+s/established\,//g
+s/flow\:established\;//g
+s/\, established\;/\;/g
+</pre>
+<p>
+Next time you'll run the update_rules.sh script it will remove <i>flow:established</i> from all of the rules!
 <br /><br />I hope this could be useful to someone out there!
 <br /><br />Cheers and have a nice day!<br />And thanks to all the pfSense developer and to the Snort package maintainer! I <b>really</b> like the Snort package, so keep up the good work!<br />
 
