@@ -1,0 +1,167 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html lang="EN" dir="ltr" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="content-type" content="text/xml; charset=utf-8" />
+
+<title>Quick fix for pfSense/Snort enable/disable rules bug</title>
+</head>
+
+<body>
+
+<h1>Quick fix for pfSense/Snort enable/disable rules bug</h1>
+<p>
+<b>
+Jack-Benny Persson
+<br /><br />
+<i>Originaly posted in the pfSense forum on 2012-04-17</i>
+</b>
+<br />
+<br />
+<table border = "1">
+<caption>Revision history</caption>
+<tr>
+<th>Revision</th>
+<th>Date</th>
+<th>Decription</th>
+<th>By</th>
+</tr>
+<tr>
+<td>Rev. 2</td>
+<td>2012-05-08</td>
+<td>Removed [rm *-e] and replaced it with [sed -i ""]</td>
+<td>jackbenny</td>
+</tr>
+<tr>
+<td>Rev. 1</td>
+<td>2012-05-01</td>
+<td>First release of this document</td>
+<td>jackbenny</td>
+</tr>
+</table>
+</p>
+<p>
+I started using the Snort package for pfSense 2.0.1 (amd64) some days ago but as many others I noticed the problem with the enable/disabled rules resetting after updating the rules.<br />
+So last night I started working on a quick fix for it, and came up with a nice and working solution. My solution involves enabling and disabling specific rules in a oinkmaster.conf file, so it&#039;s not a GUI solution. But at least now it&#039;s possible to have your own set of enabled/disabled rules.<br />
+Anyway, here we go. I&#039;ll take it step by step here.<br /><br />
+<b>First of all</b>, you&#039;ll need to install wget (so that oinkmaster.pl will work). 
+For pfSense 2.0.1 amd64 use the following command (change URL according your platform and version).
+<br />
+
+</p>
+<pre>fetch <a href="http://ftp.freebsd.org/pub/FreeBSD/ports/amd64/packages-8.2-release/ftp/wget-1.12_2.tbz">http://ftp.freebsd.org/pub/FreeBSD/ports/amd64/packages-8.2-release/ftp/wget-1.12_2.tbz</a>
+<br />pkg_add wget-1.12_2.tbz
+</pre>
+<p>
+<br /><br />
+
+<b>Next step</b> is to create a /etc/oinkmaster.conf file. Mine looks like this (change the Snort URL to include your oinkcode and change the snapshot version if you&#039;re a basic user or subscriber, look at the list on snort.org, for example use snapshot-2905 if you don&#039;t have a paid subscription).<br />
+Note: Change your enabled/disabled rule at the bottom, this is just my own example, tweak to your needs.
+<br /><br />
+</p>
+<pre>
+############################# 
+# Location of rules archive #
+#############################
+
+url = <a href="http://www.snort.org/pub-bin/oinkmaster.cgi/YOURCODEHERE/snortrules-snapshot-2922.tar.gz">http://www.snort.org/pub-bin/oinkmaster.cgi/YOURCODEHERE/snortrules-snapshot-2922.tar.gz</a>
+
+#########################
+# System configurationi #
+#########################
+path = /sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:/usr/local/sbini
+use_external_bins = 1
+tmpdir = /tmp
+umask = 0027
+
+########################
+# Extra configurationi #
+########################
+update_files = \.rules$|\.config$|\.conf$|\.txt$|\.map$
+
+# Sanity check
+use_path_checks = 1
+
+##################
+# Rules handling #
+##################
+
+# Files to skip
+skipfile local.rules
+skipfile deleted.rules
+skipfile snort.conf
+# skipfile threshold.conf
+
+# SIDs to enable
+enablesid 19559, 20120
+
+# SIDs to disable
+disablesid 19110, 19139, 19140, 19138, 19155, 19137, 19157, 19168, 19209, 19826
+</pre>
+<p>
+
+<br />
+<br /><br />
+<b>Last step</b> is to create a small shell script which will handle the update and coping of rules etc. Every time the script is being run it will download a new set of rules, enable/disable the rules you&#039;ve chosen in oinkmaster.conf, copy the files to /usr/local/etc/snort/rules and /usr/local/etc/snort/snort_YOURNIC/rules.<br />
+<b>Note: You need to change the NIC variable!</b><br />
+<br />
+</p>
+
+<pre>
+#!/bin/sh
+#################################################
+# Solution to pfSense/Snort rule disable/enable #
+# Written by Jack-Benny                         #
+#################################################
+
+# Define your Snort interface
+SNORT_NIC=&quot;47399_em0&quot;
+
+# Check if tmp dir exists, and if not, create it
+if [ ! -d &quot;/tmp/snort_rules&quot; ]; then
+/bin/mkdir /tmp/snort_rules
+fi
+
+# Time do download our new snort rules
+/usr/local/bin/oinkmaster.pl -o /tmp/snort_rules
+
+# Lets begin with adding the snort_ prefix to our rules
+cd /tmp/snort_rules
+for f in *
+do /bin/mv &quot;$f&quot; &quot;snort_$f&quot;
+done
+
+# We must add a whitespace after every &quot;#&quot; to make it compatible
+/usr/bin/sed -i -e &#039;s/^\#alert/\# alert/g&#039; snort_*
+
+# Remove sed backups files
+/bin/rm *-e
+
+# Now move them all to the correct locations
+/bin/mv /tmp/snort_rules/snort_* /usr/local/etc/snort/rules/ 
+/bin/cp /usr/local/etc/snort/rules/snort_* \
+/usr/local/etc/snort/snort_${SNORT_NIC}/rules/
+
+# And finally, restart Snort
+/usr/local/etc/rc.d/snort.sh start
+
+echo &quot;Your new rules have been downloaded and Snort has been restarted&quot;
+</pre>
+
+<p>
+
+<br /><br />If you&#039;d like <b>automatic updates</b>, just put the shell script in your crontab and let it run every 12 hour or so. Here is an example of my crontab.
+<br /><b>Don&#039;t forget to turn of automatic updates in the WebGUI</b>
+<br />
+
+</p>
+<pre>0 */12 * * * /root/update_rules.sh &gt; /root/last_rule_update.log 2&gt;&amp;1
+</pre>
+
+<p>
+<br /><br />I hope this could be useful to someone out there!
+<br /><br />Cheers and have a nice day!<br />And thanks to all the pfSense developer and to the Snort package maintainer! I <b>really</b> like the Snort package, so keep up the good work!<br />
+
+</p>
+</body>
+</html>
