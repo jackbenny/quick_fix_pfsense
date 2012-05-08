@@ -132,10 +132,7 @@ do /bin/mv &quot;$f&quot; &quot;snort_$f&quot;
 done
 
 # We must add a whitespace after every &quot;#&quot; to make it compatible
-/usr/bin/sed -i -e &#039;s/^\#alert/\# alert/g&#039; snort_*
-
-# Remove sed backups files
-/bin/rm *-e
+/usr/bin/sed -i "" -e &#039;s/^\#alert/\# alert/g&#039; snort_*
 
 # Now move them all to the correct locations
 /bin/mv /tmp/snort_rules/snort_* /usr/local/etc/snort/rules/ 
