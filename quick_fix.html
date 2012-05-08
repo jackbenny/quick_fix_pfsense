@@ -5,6 +5,11 @@
 <meta http-equiv="content-type" content="text/xml; charset=utf-8" />
 
 <title>Quick fix for pfSense/Snort enable/disable rules bug</title>
+
+<style type = "text/css">
+pre {background: #b8b8b8;}
+</style>
+
 </head>
 
 <body>
@@ -27,6 +32,12 @@ Jack-Benny Persson
 <th>By</th>
 </tr>
 <tr>
+<td>Rev. 4</td>
+<td>2012-05-09</td>
+<td>Fixed headlines, TOC, marked code in gray etc</td>
+<td>jackbenny</td>
+</tr>
+<tr>
 <td>Rev. 3</td>
 <td>2012-05-09</td>
 <td>Added flow:established problem</td>
@@ -45,7 +56,17 @@ Jack-Benny Persson
 <td>jackbenny</td>
 </tr>
 </table>
-<h2>Enable/disable rules bug</h2>
+<h2>Table of contents</h2>
+<p>
+<a href="#enabledisable">Enable/disable rules bug</a>
+<br />
+<a href="#other">Other problemsi you might encounter</a>
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#established"><i>Rules with flow:established won't work?</i></a>
+<br />
+<a href="#thanks">Thanks</a>
+</p>
+<h2><a name="enabledisable">Enable/disable rules bug</a></h2>
 <p>
 I started using the Snort package for pfSense 2.0.1 (amd64) some days ago but as many others I noticed the problem with the enable/disabled rules resetting after updating the rules.<br />
 So last night I started working on a quick fix for it, and came up with a nice and working solution. My solution involves enabling and disabling specific rules in a oinkmaster.conf file, so it&#039;s not a GUI solution. But at least now it&#039;s possible to have your own set of enabled/disabled rules.<br />
@@ -66,6 +87,7 @@ Note: Change your enabled/disabled rule at the bottom, this is just my own examp
 <br />
 </p>
 <pre>
+#oinkmaster.conf
 ############################# 
 # Location of rules archive #
 #############################
@@ -106,11 +128,9 @@ disablesid 19110, 19139, 19140, 19138, 19155, 19137, 19157, 19168, 19209, 19826
 </pre>
 <p>
 
-
 <br />
 <b>Last step</b> is to create a small shell script (I've named it update_rules.sh) which will handle the update and coping of rules etc. Every time the script is being run it will download a new set of rules, enable/disable the rules you&#039;ve chosen in oinkmaster.conf, copy the files to /usr/local/etc/snort/rules and /usr/local/etc/snort/snort_YOURNIC/rules.<br />
 <b>Note: You need to change the NIC variable!</b><br />
-<br />
 </p>
 
 <pre>
@@ -162,8 +182,8 @@ echo &quot;Your new rules have been downloaded and Snort has been restarted&quot
 <pre>0 */12 * * * /root/update_rules.sh &gt; /root/last_rule_update.log 2&gt;&amp;1
 </pre>
 
-<h2>Other problems you might encounter</h2>
-<h3>Rules with flow:established won't work?</h3>
+<h2><a name="other">Other problems you might encounter</a></h2>
+<h3><a name="established">Rules with flow:established won't work?</a></h3>
 <p>
 For some reason my Snort wouldn't trigger any alerts on rules that contained the <i>flow:established</i> keyword. I noticed something was wrong when my pfSense/Snort had been live for about week without any alerts at all. So I got suspicous and tested it thoroughly with various simple rules. Still nothing. I couldn't figure out what I was doing wrong. So just out of curiosity I started to modify the rules to see what happend. All of the sudden I've got a rule to trigger alerts! What had I done? I'd removed the <i>flow:established</i> keyword from the rule. I tried it out on some other rules aswell, and got the same effect. So instantly I started googling the problem and found out that many people were seeing this issue aswell (although it didn't seem to be affecting many pfSense users at all, mostly people running Snort on their Linux machines). But nonetheless, other people were seeing this issue aswell, so I was not alone.
 Several people had been asking about it in various forums. Often the reply was that their box must be misconfigured somehow so that the TCP packages isn't properly assembled. I found out that there are several config options one could try to make Snort reassemble the packges. But these were all already activated in my config. So what's left to make it work now? Remove all the <i>flow:established</i> keywords from all the rules. After some reading, I've come to the conclusion that this shouldn't have any big negative side effects.
@@ -220,6 +240,7 @@ done
 echo "Your new rules have been downloaded and Snort has been restarted"
 </pre>
 <p>
+<br />
 <b>Next step</b> now is to create a new file with the sed replace commands in. As you can see from the script I've placed this file unde /root and named it <i>no_established.sed</i>.
 This is a a sed script file which contains the following lines:
 </p>
@@ -231,9 +252,12 @@ s/\, established\;/\;/g
 </pre>
 <p>
 Next time you'll run the update_rules.sh script it will remove <i>flow:established</i> from all of the rules!
-<br /><br />I hope this could be useful to someone out there!
-<br /><br />Cheers and have a nice day!<br />And thanks to all the pfSense developer and to the Snort package maintainer! I <b>really</b> like the Snort package, so keep up the good work!<br />
-
+</p>
+<h2><a name="thanks">Thanks</a></h2>
+<p>
+I hope this could be useful to someone out there!
+<br />
+And thanks to all the pfSense developer and to the Snort package maintainer! I <b>really</b> like the Snort package, so keep up the good work!<br />
 </p>
 </body>
 </html>
