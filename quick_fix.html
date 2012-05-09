@@ -32,6 +32,12 @@ Jack-Benny Persson
 <th>By</th>
 </tr>
 <tr>
+<td>Rev. 5</td>
+<td>2012-05-10</td>
+<td>Added solution to emerging threats rules</td>
+<td>jackbenny</td>
+</tr>
+<tr>
 <td>Rev. 4</td>
 <td>2012-05-09</td>
 <td>Fixed headlines, TOC, marked code in gray etc</td>
@@ -63,6 +69,8 @@ Jack-Benny Persson
 <a href="#other">Other problemsi you might encounter</a>
 <br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#established"><i>Rules with flow:established won't work?</i></a>
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#emerging"><i>What about Emerging Threats rules?</i></a>
 <br />
 <a href="#thanks">Thanks</a>
 </p>
@@ -252,6 +260,10 @@ s/\, established\;/\;/g
 </pre>
 <p>
 Next time you'll run the update_rules.sh script it will remove <i>flow:established</i> from all of the rules!
+</p>
+<h3><a name="emerging">What about Emerging Threats rules?</a></h3>
+<p>
+I later realized that I also wanted to use some Emerging Threats rules with my pfSense/Snort box. The principle to get Emerging Threats rules to work is pretty much the same, except we won't use oinkmaster here. Instead we download the rules in our update script we create below.
 </p>
 <h2><a name="thanks">Thanks</a></h2>
 <p>
