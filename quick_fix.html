@@ -264,7 +264,85 @@ Next time you'll run the update_rules.sh script it will remove <i>flow:establish
 <h3><a name="emerging">What about Emerging Threats rules?</a></h3>
 <p>
 I later realized that I also wanted to use some Emerging Threats rules with my pfSense/Snort box. The principle to get Emerging Threats rules to work is pretty much the same, except we won't use oinkmaster here. Instead we download the rules in our update script we create below.
+NOTE: For the below script you have to download and install Bash, the shell that comes with pfSense won't work! To download and install the Bash simply run these commands.
 </p>
+<pre>
+ftp://ftp.freebsd.org/pub/FreeBSD/ports/amd64/packages-8-stable/shells/bash-static-4.2.28.tbz
+
+pkg_add bash-static-4.2.28.tbz
+</pre>
+<p>
+And that's it, now you have Bash installed. Lets move on the script to enable emerging threats rule (I've named it The Judge, hence the rules).
+</p>
+<pre>
+#!/usr/local/bin/bash
+
+###############################################################
+### The Judge                                               ###
+### Enables and disables emerging threats rules for pfSense ###
+### Author: Jack-Benny Persson                              ###
+### Date: 2012-05-05                                        ###
+### Version: 0.2                                            ###
+###############################################################
+
+### Begin config options ###
+
+# Enter the SIDs to enable inside the parathenis below
+ENABLE=( 2012410 2012450 )
+
+# Enter the SIDs to disable inside the parathensis below
+DISABLE=( 2003474 ) 
+
+# Path to the rules
+RULES="rules/"
+
+# Prefix to our rules
+PREFIX="emerging-"
+
+# Download URL (emerging threas rules)
+DLURL="http://rules.emergingthreats.net/open/snort-2.9.0/emerging.rules.tar.gz"
+
+### End config options ###
+
+
+# Santiy checks etc
+if [ ! -d "/tmp/emerging_rules" ]; then
+/bin/mkdir /tmp/emerging_rules
+fi
+
+# cd to temp dir
+cd /tmp/emerging_rules
+
+# Download the rules
+/usr/local/bin/wget ${DLURL}
+
+#Unpack them
+/usr/bin/tar zxf emerging.rules.tar.gz
+
+# Change "#alert" to "# alert" to make it work...
+/usr/bin/sed -i "" -e 's/^\#alert/\# alert/g' ${RULES}${PREFIX}*
+
+# Remove established keyword
+/usr/bin/sed -i "" -f /root/no_established.sed /tmp/emerging_rules/rules/${PREFIX}*
+
+# Enable the rules we've chosen
+for i in "${ENABLE[@]}"
+do
+/usr/bin/sed -i "" -e "/$i/ s/^\# alert/alert/" ${RULES}${PREFIX}*
+done
+
+#Disable the rules we've chosen
+for i in "${DISABLE[@]}"
+do
+/usr/bin/sed -i "" -e "/$i/ s/^alert/\# alert/" ${RULES}${PREFIX}*
+done
+
+#Move them to /usr/local/etc/snor/rules...
+/bin/mv /tmp/emerging_rules/rules/${PREFIX}* /usr/local/etc/snort/rules
+
+#And finally, delete the tar.gz
+/bin/rm emerging.rules.tar.gz
+</pre>
 <h2><a name="thanks">Thanks</a></h2>
 <p>
 I hope this could be useful to someone out there!
